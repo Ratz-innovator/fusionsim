@@ -2,14 +2,14 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 from diffusion_simulation import run_simulation
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import matplotlib
 matplotlib.use('Agg')  # Use a non-interactive backend
 import matplotlib.pyplot as plt
 from io import BytesIO
 from fastapi.responses import StreamingResponse, JSONResponse
 from enum import Enum
-from typing import Optional
+from typing import Optional, Any, ClassVar
 import imageio.v2 as imageio
 import os
 import tempfile
@@ -54,9 +54,10 @@ class SimulationParams(BaseModel):
     k: Optional[float] = Field(1.0, gt=0, description="Thermal conductivity (for heat equation)")
     velocity: Optional[float] = Field(1.0, description="Advection velocity (for advection-diffusion)")
 
-    # Validators to ensure integer fields are actually integers
-    @validator('nx', 'steps', 'store_frames')
-    def ensure_integers(cls, v, values, **kwargs):
+    # Updated validator to use field_validator instead of validator
+    @field_validator('nx', 'steps', 'store_frames')
+    @classmethod  # This is now required in Pydantic v2
+    def ensure_integers(cls, v: Any) -> Any:
         if not isinstance(v, int):
             raise ValueError(f"Must be an integer, got {type(v).__name__}")
         return v
@@ -219,4 +220,10 @@ async def diffusion(params: SimulationParams):
         return JSONResponse(
             status_code=500,
             content={"detail": str(e), "type": str(type(e).__name__)}
-        ) 
+        )
+
+# Add at the end of the file:
+if __name__ == "__main__":
+    import uvicorn
+    print("Starting FusionSim Backend Server at http://localhost:8080")
+    uvicorn.run(app, host="0.0.0.0", port=8080) 
