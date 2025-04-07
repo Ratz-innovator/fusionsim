@@ -41,7 +41,9 @@ The project demonstrates the application of numerical methods to solve partial d
 
 ## Screenshots
 
-*Simulation examples will appear here after running the application*
+<p align="center">
+  <img src="screenshots/fusionsim_interface.png" alt="FusionSim Interface" width="80%"/>
+</p>
 
 ## Installation
 
