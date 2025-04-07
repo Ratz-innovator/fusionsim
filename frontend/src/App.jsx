@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8080';
@@ -21,6 +21,7 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [imageUrl, setImageUrl] = useState(null);
+  const [backendStatus, setBackendStatus] = useState('checking');
   const [validation, setValidation] = useState({
     nx: true,
     dx: true,
@@ -31,6 +32,11 @@ const App = () => {
     dt: true,
     store_frames: true
   });
+
+  // Check backend connectivity on load
+  useEffect(() => {
+    testBackendConnection();
+  }, []);
 
   // Get the relevant parameters based on simulation type
   const getRelevantParams = () => {
@@ -198,12 +204,12 @@ const App = () => {
       case 'velocity': return 'Advection Velocity';
       case 'steps': return 'Time Steps - Integer';
       case 'dt': return 'Time Step Size (dt)';
-      case 'store_frames': return 'Animation Frames (1-50) - Integer';
+      case 'store_frames': return 'Animation Frames - Integer (max 50)';
       default: return param;
     }
   };
 
-  // Get simulation title based on type
+  // Get simulation title
   const getSimulationTitle = () => {
     switch (formData.simulation_type) {
       case 'diffusion': return 'Diffusion Simulation';
@@ -213,126 +219,252 @@ const App = () => {
     }
   };
 
-  // Add this function before the return statement
+  // Test backend connection
   const testBackendConnection = async () => {
     try {
+      setBackendStatus('checking');
       const response = await axios.get(`${API_BASE_URL}/`);
-      console.log("Backend connection test:", response.data);
-      return true;
+      if (response.status === 200) {
+        setBackendStatus('connected');
+      } else {
+        setBackendStatus('error');
+      }
     } catch (err) {
-      console.error("Backend connection test failed:", err);
-      return false;
+      console.error("Backend connection error:", err);
+      setBackendStatus('error');
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl p-6">
-        <h1 className="text-2xl font-bold text-center text-gray-900 mb-6">
-          FusionSim 1D {getSimulationTitle()}
-        </h1>
-        
-        {/* Error message */}
-        {error && (
-          <div className="bg-red-50 text-red-700 p-4 rounded-md mb-4">
-            <p className="text-sm">{error}</p>
-            <button 
-              className="mt-2 text-xs text-blue-600 hover:text-blue-800"
-              onClick={() => testBackendConnection()
-                .then(connected => {
-                  if (connected) {
-                    setError("Backend is running but there was an error with the simulation request.");
-                  } else {
-                    setError("Cannot connect to backend. Is the server running at " + API_BASE_URL + "?");
-                  }
-                })
-              }
-            >
-              Test backend connection
-            </button>
+    <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow-md py-4">
+        <div className="container mx-auto px-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-600 rounded-full w-10 h-10 flex items-center justify-center text-white font-bold text-xl">F</div>
+            <h1 className="text-2xl font-bold text-gray-800">FusionSim</h1>
           </div>
-        )}
-        
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Simulation Type Selector */}
-          <div>
-            <label htmlFor="simulation_type" className="block text-sm font-medium text-gray-700">
-              Simulation Type
-            </label>
-            <select
-              id="simulation_type"
-              name="simulation_type"
-              value={formData.simulation_type}
-              onChange={handleChange}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="diffusion">Diffusion</option>
-              <option value="heat">Heat Equation</option>
-              <option value="advection_diffusion">Advection-Diffusion</option>
-            </select>
+          <div className="text-sm px-3 py-1 rounded-full flex items-center">
+            {backendStatus === 'connected' && (
+              <span className="flex items-center text-green-700">
+                <span className="w-2 h-2 bg-green-600 rounded-full mr-2"></span>
+                Backend Connected
+              </span>
+            )}
+            {backendStatus === 'checking' && (
+              <span className="flex items-center text-yellow-700">
+                <span className="w-2 h-2 bg-yellow-600 rounded-full mr-2"></span>
+                Checking Connection
+              </span>
+            )}
+            {backendStatus === 'error' && (
+              <span className="flex items-center text-red-700">
+                <span className="w-2 h-2 bg-red-600 rounded-full mr-2"></span>
+                Backend Disconnected
+                <button 
+                  className="ml-2 text-blue-600 underline text-xs"
+                  onClick={testBackendConnection}
+                >
+                  Retry
+                </button>
+              </span>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-6 flex-grow">
+        <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
+          <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+            <h2 className="text-2xl font-bold">{getSimulationTitle()}</h2>
+            <p className="mt-1 text-blue-100">Configure parameters and visualize your simulation</p>
           </div>
           
-          {/* Dynamic form fields based on simulation type */}
-          {getRelevantParams().map(param => (
-            <div key={param}>
-              <label htmlFor={param} className="block text-sm font-medium text-gray-700">
-                {getParameterLabel(param)}
-              </label>
-              <input
-                type="number"
-                step={param === 'nx' || param === 'steps' || param === 'store_frames' ? "1" : "0.1"}
-                name={param}
-                id={param}
-                value={formData[param]}
-                onChange={handleChange}
-                className={`mt-1 block w-full px-3 py-2 border ${
-                  validation[param] ? 'border-gray-300' : 'border-red-500'
-                } rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500`}
-                required
-                min={param === 'velocity' ? null : (param === 'nx' || param === 'steps' || param === 'store_frames' ? "1" : "0.1")}
-                max={param === 'store_frames' ? "50" : null}
-              />
-              {param === 'store_frames' && (
-                <p className="mt-1 text-xs text-gray-500">More frames = smoother animation but longer processing time</p>
-              )}
-              {(param === 'nx' || param === 'steps' || param === 'store_frames') && (
-                <p className="mt-1 text-xs text-red-500 font-semibold">Must be a whole number!</p>
-              )}
+          <div className="p-6">
+            {/* Grid layout for form and results */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Form section */}
+              <div className="bg-gray-50 p-5 rounded-lg shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">Simulation Parameters</h3>
+                
+                <form onSubmit={handleSubmit}>
+                  {/* Simulation Type */}
+                  <div className="mb-5">
+                    <label className="block text-gray-700 font-medium mb-2" htmlFor="simulation_type">
+                      Simulation Type
+                    </label>
+                    <select
+                      id="simulation_type"
+                      name="simulation_type"
+                      value={formData.simulation_type}
+                      onChange={handleChange}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="diffusion">Diffusion</option>
+                      <option value="heat">Heat Equation</option>
+                      <option value="advection_diffusion">Advection-Diffusion</option>
+                    </select>
+                  </div>
+                  
+                  {/* Dynamic form fields based on simulation type */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {getRelevantParams().map(param => (
+                      <div key={param} className="mb-4">
+                        <label className="block text-gray-700 font-medium mb-2" htmlFor={param}>
+                          {getParameterLabel(param)}
+                        </label>
+                        <input
+                          type="number"
+                          id={param}
+                          name={param}
+                          value={formData[param]}
+                          onChange={handleChange}
+                          className={`w-full p-2 border rounded-md focus:outline-none focus:ring-2 ${
+                            validation[param] ? 'border-gray-300 focus:ring-blue-500' : 'border-red-500 focus:ring-red-500'
+                          }`}
+                          step={param === 'nx' || param === 'steps' || param === 'store_frames' ? "1" : "0.1"}
+                        />
+                        {!validation[param] && (
+                          <p className="mt-1 text-red-600 text-sm">
+                            {param === 'velocity' ? 'Velocity cannot be zero.' : 
+                             param === 'store_frames' ? 'Must be a positive integer up to 50.' :
+                             param === 'nx' || param === 'steps' ? 'Must be a positive integer.' :
+                             'Must be a positive number.'}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Submit button */}
+                  <div className="mt-6">
+                    <button
+                      type="submit"
+                      disabled={loading || !isFormValid() || backendStatus !== 'connected'}
+                      className={`w-full py-3 px-4 rounded-md font-medium text-white transition-colors ${
+                        loading ? 'bg-gray-500' : 
+                        !isFormValid() || backendStatus !== 'connected' ? 'bg-gray-400 cursor-not-allowed' : 
+                        'bg-blue-600 hover:bg-blue-700'
+                      }`}
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Running Simulation...
+                        </span>
+                      ) : 'Run Simulation'}
+                    </button>
+                  </div>
+                  
+                  {/* Error message */}
+                  {error && (
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm">
+                      <strong>Error:</strong> {error}
+                    </div>
+                  )}
+                </form>
+              </div>
+              
+              {/* Results section */}
+              <div className="bg-gray-50 p-5 rounded-lg shadow-sm flex flex-col">
+                <h3 className="text-lg font-semibold text-gray-700 mb-4">Simulation Results</h3>
+                
+                <div className="flex-grow flex items-center justify-center bg-white border border-gray-200 rounded-md p-4">
+                  {imageUrl ? (
+                    <div className="text-center">
+                      <img 
+                        src={imageUrl} 
+                        alt="Simulation Result" 
+                        className="max-w-full h-auto rounded-md shadow-sm mx-auto"
+                      />
+                      <p className="mt-3 text-gray-600 text-sm">
+                        The animation shows how the system evolves over time based on your parameters.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto mb-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <p className="text-lg font-medium">No Simulation Results Yet</p>
+                      <p className="mt-2">Configure parameters and run a simulation to see results here.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          ))}
-          
-          {/* Submit button */}
-          <div>
-            <button
-              type="submit"
-              disabled={loading || !isFormValid()}
-              className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
-                loading || !isFormValid() 
-                  ? 'bg-indigo-300 cursor-not-allowed' 
-                  : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-              }`}
-            >
-              {loading ? 'Running Simulation...' : 'Run Simulation'}
-            </button>
+            
+            {/* Simulation Information */}
+            <div className="mt-8 bg-gray-50 p-5 rounded-lg shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4">About This Simulation</h3>
+              
+              <div className="prose max-w-none">
+                {formData.simulation_type === 'diffusion' && (
+                  <div>
+                    <p>
+                      This simulation models the <strong>one-dimensional diffusion process</strong> of a substance, governed by the equation:
+                    </p>
+                    <pre className="bg-gray-100 p-2 rounded-md text-sm overflow-x-auto my-3">∂u/∂t = D * ∂²u/∂x²</pre>
+                    <p>
+                      Where <code>D</code> is the diffusion coefficient controlling how quickly the substance spreads. 
+                      The simulation starts with a Gaussian pulse in the center of the domain.
+                    </p>
+                  </div>
+                )}
+                
+                {formData.simulation_type === 'heat' && (
+                  <div>
+                    <p>
+                      This simulation models <strong>one-dimensional heat conduction</strong>, governed by the equation:
+                    </p>
+                    <pre className="bg-gray-100 p-2 rounded-md text-sm overflow-x-auto my-3">∂T/∂t = k * ∂²T/∂x²</pre>
+                    <p>
+                      Where <code>k</code> is the thermal conductivity coefficient. 
+                      The simulation starts with a heat source in the center and fixed zero-temperature boundaries.
+                    </p>
+                  </div>
+                )}
+                
+                {formData.simulation_type === 'advection_diffusion' && (
+                  <div>
+                    <p>
+                      This simulation models the <strong>combined advection and diffusion process</strong>, governed by the equation:
+                    </p>
+                    <pre className="bg-gray-100 p-2 rounded-md text-sm overflow-x-auto my-3">∂u/∂t + v * ∂u/∂x = D * ∂²u/∂x²</pre>
+                    <p>
+                      Where <code>v</code> is the advection velocity and <code>D</code> is the diffusion coefficient. 
+                      The simulation shows how a substance is simultaneously transported and spread out.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </form>
-        
-        {/* Simulation result */}
-        {imageUrl && (
-          <div className="mt-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-2">Simulation Animation</h2>
-            <img 
-              src={imageUrl} 
-              alt="Simulation Animation" 
-              className="w-full h-auto border border-gray-300 rounded-md"
-            />
-            <p className="mt-2 text-sm text-gray-600 italic">
-              Animation shows the evolution of the simulation over time
-            </p>
+        </div>
+      </main>
+      
+      {/* Footer */}
+      <footer className="bg-gray-800 text-white py-6 mt-10">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row justify-between items-center">
+            <div className="mb-4 md:mb-0">
+              <div className="flex items-center">
+                <div className="bg-blue-600 rounded-full w-8 h-8 flex items-center justify-center text-white font-bold text-sm mr-2">F</div>
+                <span className="font-semibold text-lg">FusionSim</span>
+              </div>
+              <p className="text-gray-400 text-sm mt-1">A powerful 1D diffusion simulation tool</p>
+            </div>
+            
+            <div className="text-center md:text-right">
+              <p className="text-sm text-gray-400">Made with ❤️ by a self-taught developer</p>
+              <p className="text-xs text-gray-500 mt-1">© {new Date().getFullYear()} FusionSim. All rights reserved.</p>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      </footer>
     </div>
   );
 };
