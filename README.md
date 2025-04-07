@@ -12,7 +12,6 @@
 <p align="center">
   <a href="#overview">Overview</a> •
   <a href="#features">Features</a> •
-  <a href="#live-demo">Live Demo</a> •
   <a href="#screenshots">Screenshots</a> •
   <a href="#installation">Installation</a> •
   <a href="#usage">Usage</a> •
@@ -40,19 +39,9 @@ The project demonstrates the application of numerical methods to solve partial d
 - ⚡ **Fast Backend**: Efficient simulation processing with FastAPI
 - 🛡️ **Error Handling**: Robust error feedback for both client-side and server-side issues
 
-## Live Demo
-
-Experience FusionSim in action: [https://YOUR-DEMO-URL.com](https://YOUR-DEMO-URL.com)
-
 ## Screenshots
 
-<p align="center">
-  <img src="https://user-images.githubusercontent.com/YOUR_ID/YOUR_REPO/main/screenshot1.png" alt="FusionSim Interface" width="80%"/>
-</p>
-
-<p align="center">
-  <img src="https://user-images.githubusercontent.com/YOUR_ID/YOUR_REPO/main/screenshot2.gif" alt="Simulation Animation" width="80%"/>
-</p>
+*Simulation examples will appear here after running the application*
 
 ## Installation
 
@@ -150,16 +139,18 @@ where `v` is the advection velocity and `D` is the diffusion coefficient.
 
 ## About the Developer
 
-This project was entirely designed and implemented by a self-taught developer passionate about computational physics and web development. With no formal education in computer science, the developer learned programming principles, numerical methods, and web technologies through online resources, documentation, and persistent problem-solving.
+This project was entirely designed and implemented by me, Ratnesh Kumar, a self-taught developer passionate about computational physics and web development. With no formal education in computer science, I've learned programming principles, numerical methods, and web technologies through online resources, documentation, and persistent problem-solving.
 
-FusionSim represents not just a technical achievement, but a testament to the power of self-directed learning and the accessibility of programming knowledge in today's digital landscape.
+FusionSim represents not just a technical achievement, but a testament to the power of self-directed learning and the accessibility of programming knowledge in today's digital landscape. The project demonstrates my ability to integrate complex mathematical concepts with modern web technologies to create useful applications.
+
+From implementing differential equations in Python to designing a responsive frontend in React, every aspect of this project was built through self-study and determination. I'm proud to share this work as an example of what's possible through dedicated independent learning.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 
 <p align="center">
-  Made with ❤️ by a self-taught developer
+  Made with ❤️ by Ratnesh Kumar, a self-taught developer
 </p> 
