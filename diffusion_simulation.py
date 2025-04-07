@@ -1,51 +1,106 @@
+"""
+FusionSim Diffusion Simulation Module
+-----------------------------------
+This module provides functions to run different types of 1D simulations:
+1. Diffusion - Simple diffusion of a substance
+2. Heat Equation - Heat conduction with fixed boundaries
+3. Advection-Diffusion - Combined transport and diffusion
+
+All simulations use FiPy, a finite volume PDE solver.
+"""
+
+from typing import List, Union, Literal, Optional, Dict, Any
 import numpy as np
 from fipy import CellVariable, Grid1D, TransientTerm, DiffusionTerm, AdvectionTerm, Viewer
 
-def run_diffusion_simulation(nx=50, dx=1.0, D=1.0, steps=100, dt=0.1, store_steps=10):
+# Type alias for simulation types
+SimulationType = Literal["diffusion", "heat", "advection_diffusion"]
+
+def run_simulation(
+    simulation_type: SimulationType,
+    nx: int = 50,
+    dx: float = 1.0,
+    D: Optional[float] = None,
+    k: Optional[float] = None,
+    velocity: Optional[float] = None,
+    steps: int = 100,
+    dt: float = 0.1,
+    store_steps: int = 10
+) -> List[np.ndarray]:
+    """
+    Run a simulation of the specified type with the given parameters.
+    
+    Args:
+        simulation_type: Type of simulation to run
+        nx: Number of cells in the mesh
+        dx: Cell size
+        D: Diffusion coefficient (for diffusion and advection-diffusion)
+        k: Thermal conductivity (for heat equation)
+        velocity: Advection velocity (for advection-diffusion)
+        steps: Number of time steps to run
+        dt: Time step size
+        store_steps: Number of timesteps to store results for
+        
+    Returns:
+        List of numpy arrays containing the simulation results at different timesteps
+        
+    Raises:
+        ValueError: If invalid parameters are provided
+        RuntimeError: If the simulation fails
+    """
+    # Select the appropriate simulation function based on type
+    if simulation_type == "diffusion":
+        if D is None:
+            raise ValueError("Diffusion coefficient (D) must be provided for diffusion simulation")
+        return run_diffusion_simulation(nx=nx, dx=dx, D=D, steps=steps, dt=dt, store_steps=store_steps)
+    
+    elif simulation_type == "heat":
+        if k is None:
+            raise ValueError("Thermal conductivity (k) must be provided for heat equation simulation")
+        return run_heat_equation_simulation(nx=nx, dx=dx, k=k, steps=steps, dt=dt, store_steps=store_steps)
+    
+    elif simulation_type == "advection_diffusion":
+        if D is None:
+            raise ValueError("Diffusion coefficient (D) must be provided for advection-diffusion simulation")
+        if velocity is None:
+            raise ValueError("Velocity must be provided for advection-diffusion simulation")
+        return run_advection_diffusion_simulation(
+            nx=nx, dx=dx, D=D, velocity=velocity, steps=steps, dt=dt, store_steps=store_steps
+        )
+    
+    else:
+        raise ValueError(f"Unknown simulation type: {simulation_type}")
+
+def run_diffusion_simulation(
+    nx: int = 50,
+    dx: float = 1.0,
+    D: float = 1.0,
+    steps: int = 100,
+    dt: float = 0.1,
+    store_steps: int = 10
+) -> List[np.ndarray]:
     """
     Run a simple 1D diffusion simulation.
     
-    Parameters:
-    -----------
-    nx : int
-        Number of cells in the mesh
-    dx : float
-        Cell size
-    D : float
-        Diffusion coefficient
-    steps : int
-        Number of time steps to run
-    dt : float
-        Time step size
-    store_steps : int
-        Store results every this many steps
+    This simulation models the equation: ∂u/∂t = D * ∂²u/∂x²
+    
+    Args:
+        nx: Number of cells in the mesh
+        dx: Cell size
+        D: Diffusion coefficient
+        steps: Number of time steps to run
+        dt: Time step size
+        store_steps: Number of timesteps to store results for
         
     Returns:
-    --------
-    list of numpy.ndarray
-        List of concentration values at stored timesteps
+        List of numpy arrays with concentration values at stored timesteps
+        
+    Raises:
+        ValueError: If any parameter is invalid
     """
     # Validate input parameters
-    nx = int(nx)
-    steps = int(steps)
-    store_steps = int(store_steps)
-    dx = float(dx)
-    D = float(D)
-    dt = float(dt)
+    _validate_simulation_params(nx=nx, dx=dx, D=D, steps=steps, dt=dt, store_steps=store_steps)
     
-    if nx <= 0:
-        raise ValueError(f"nx must be positive, got {nx}")
-    if steps <= 0:
-        raise ValueError(f"steps must be positive, got {steps}")
-    if store_steps <= 0:
-        raise ValueError(f"store_steps must be positive, got {store_steps}")
-    if dx <= 0:
-        raise ValueError(f"dx must be positive, got {dx}")
-    if D <= 0:
-        raise ValueError(f"D must be positive, got {D}")
-    if dt <= 0:
-        raise ValueError(f"dt must be positive, got {dt}")
-        
     # Create a 1D mesh
     mesh = Grid1D(nx=nx, dx=dx)
     
@@ -62,62 +117,54 @@ def run_diffusion_simulation(nx=50, dx=1.0, D=1.0, steps=100, dt=0.1, store_step
     # Store for recording timesteps
     results = [np.array(phi.value)]
     
+    # Calculate saving frequency
+    save_frequency = max(1, steps // store_steps)
+    
     # Solve the equation for the specified number of steps
-    for step in range(steps):
-        eq.solve(var=phi, dt=dt)
-        
-        # Store results at specified intervals
-        if (step + 1) % max(1, steps // store_steps) == 0 or step == steps - 1:
-            results.append(np.array(phi.value))
+    try:
+        for step in range(steps):
+            eq.solve(var=phi, dt=dt)
+            
+            # Store results at specified intervals
+            if (step + 1) % save_frequency == 0 or step == steps - 1:
+                results.append(np.array(phi.value))
+    except Exception as e:
+        raise RuntimeError(f"Error during diffusion simulation: {str(e)}") from e
     
     # Return the list of stored results
     return results
 
-def run_heat_equation_simulation(nx=50, dx=1.0, k=1.0, steps=100, dt=0.1, store_steps=10):
+def run_heat_equation_simulation(
+    nx: int = 50,
+    dx: float = 1.0,
+    k: float = 1.0,
+    steps: int = 100,
+    dt: float = 0.1,
+    store_steps: int = 10
+) -> List[np.ndarray]:
     """
     Run a 1D heat equation simulation.
     
-    Parameters:
-    -----------
-    nx : int
-        Number of cells in the mesh
-    dx : float
-        Cell size
-    k : float
-        Thermal conductivity coefficient
-    steps : int
-        Number of time steps to run
-    dt : float
-        Time step size
-    store_steps : int
-        Store results every this many steps
+    This simulation models the equation: ∂T/∂t = k * ∂²T/∂x²
+    With fixed zero-temperature boundaries.
+    
+    Args:
+        nx: Number of cells in the mesh
+        dx: Cell size
+        k: Thermal conductivity coefficient
+        steps: Number of time steps to run
+        dt: Time step size
+        store_steps: Number of timesteps to store results for
         
     Returns:
-    --------
-    list of numpy.ndarray
-        List of temperature values at stored timesteps
+        List of numpy arrays with temperature values at stored timesteps
+        
+    Raises:
+        ValueError: If any parameter is invalid
     """
     # Validate input parameters
-    nx = int(nx)
-    steps = int(steps)
-    store_steps = int(store_steps)
-    dx = float(dx)
-    k = float(k)
-    dt = float(dt)
+    _validate_simulation_params(nx=nx, dx=dx, k=k, steps=steps, dt=dt, store_steps=store_steps)
     
-    if nx <= 0:
-        raise ValueError(f"nx must be positive, got {nx}")
-    if steps <= 0:
-        raise ValueError(f"steps must be positive, got {steps}")
-    if store_steps <= 0:
-        raise ValueError(f"store_steps must be positive, got {store_steps}")
-    if dx <= 0:
-        raise ValueError(f"dx must be positive, got {dx}")
-    if k <= 0:
-        raise ValueError(f"k must be positive, got {k}")
-    if dt <= 0:
-        raise ValueError(f"dt must be positive, got {dt}")
-        
     # Create a 1D mesh
     mesh = Grid1D(nx=nx, dx=dx)
     
@@ -138,127 +185,133 @@ def run_heat_equation_simulation(nx=50, dx=1.0, k=1.0, steps=100, dt=0.1, store_
     # Store for recording timesteps
     results = [np.array(T.value)]
     
+    # Calculate saving frequency
+    save_frequency = max(1, steps // store_steps)
+    
     # Solve the equation for the specified number of steps
-    for step in range(steps):
-        eq.solve(var=T, dt=dt)
-        
-        # Store results at specified intervals
-        if (step + 1) % max(1, steps // store_steps) == 0 or step == steps - 1:
-            results.append(np.array(T.value))
+    try:
+        for step in range(steps):
+            eq.solve(var=T, dt=dt)
+            
+            # Store results at specified intervals
+            if (step + 1) % save_frequency == 0 or step == steps - 1:
+                results.append(np.array(T.value))
+    except Exception as e:
+        raise RuntimeError(f"Error during heat equation simulation: {str(e)}") from e
     
     # Return the list of stored results
     return results
 
-def run_advection_diffusion_simulation(nx=50, dx=1.0, D=1.0, velocity=1.0, steps=100, dt=0.1, store_steps=10):
+def run_advection_diffusion_simulation(
+    nx: int = 50,
+    dx: float = 1.0,
+    D: float = 1.0,
+    velocity: float = 1.0,
+    steps: int = 100,
+    dt: float = 0.1,
+    store_steps: int = 10
+) -> List[np.ndarray]:
     """
     Run a 1D advection-diffusion simulation.
     
-    Parameters:
-    -----------
-    nx : int
-        Number of cells in the mesh
-    dx : float
-        Cell size
-    D : float
-        Diffusion coefficient
-    velocity : float
-        Advection velocity
-    steps : int
-        Number of time steps to run
-    dt : float
-        Time step size
-    store_steps : int
-        Store results every this many steps
+    This simulation models the equation: ∂u/∂t + v * ∂u/∂x = D * ∂²u/∂x²
+    
+    Args:
+        nx: Number of cells in the mesh
+        dx: Cell size
+        D: Diffusion coefficient
+        velocity: Advection velocity
+        steps: Number of time steps to run
+        dt: Time step size
+        store_steps: Number of timesteps to store results for
         
     Returns:
-    --------
-    list of numpy.ndarray
-        List of concentration values at stored timesteps
+        List of numpy arrays with concentration values at stored timesteps
+        
+    Raises:
+        ValueError: If any parameter is invalid
     """
     # Validate input parameters
-    nx = int(nx)
-    steps = int(steps)
-    store_steps = int(store_steps)
-    dx = float(dx)
-    D = float(D)
-    velocity = float(velocity)
-    dt = float(dt)
+    _validate_simulation_params(
+        nx=nx, dx=dx, D=D, velocity=velocity, steps=steps, dt=dt, store_steps=store_steps
+    )
     
-    if nx <= 0:
-        raise ValueError(f"nx must be positive, got {nx}")
-    if steps <= 0:
-        raise ValueError(f"steps must be positive, got {steps}")
-    if store_steps <= 0:
-        raise ValueError(f"store_steps must be positive, got {store_steps}")
-    if dx <= 0:
-        raise ValueError(f"dx must be positive, got {dx}")
-    if D <= 0:
-        raise ValueError(f"D must be positive, got {D}")
-    if velocity == 0:
-        raise ValueError("velocity cannot be zero")
-    if dt <= 0:
-        raise ValueError(f"dt must be positive, got {dt}")
-        
     # Create a 1D mesh
     mesh = Grid1D(nx=nx, dx=dx)
     
     # Create a variable on the mesh
     phi = CellVariable(name="concentration", mesh=mesh, value=0.0)
     
-    # Set initial condition: Gaussian pulse on the left side
+    # Set initial condition: Gaussian pulse slightly to the left of center
+    # This allows better visualization of advection effects
+    center_offset = nx * dx / 4  # Offset from center
     x = mesh.cellCenters[0]
-    phi.value = np.exp(-((x - nx * dx / 5) ** 2) / (dx ** 2 * 10))
+    phi.value = np.exp(-((x - (nx * dx / 2 - center_offset)) ** 2) / (dx ** 2 * 10))
     
     # Create the advection-diffusion equation
-    eq = TransientTerm() == DiffusionTerm(coeff=D) - AdvectionTerm(coeff=velocity)
+    eq = (TransientTerm() + 
+          AdvectionTerm(coeff=velocity) == 
+          DiffusionTerm(coeff=D))
     
     # Store for recording timesteps
     results = [np.array(phi.value)]
     
+    # Calculate saving frequency
+    save_frequency = max(1, steps // store_steps)
+    
     # Solve the equation for the specified number of steps
-    for step in range(steps):
-        eq.solve(var=phi, dt=dt)
-        
-        # Store results at specified intervals
-        if (step + 1) % max(1, steps // store_steps) == 0 or step == steps - 1:
-            results.append(np.array(phi.value))
+    try:
+        for step in range(steps):
+            eq.solve(var=phi, dt=dt)
+            
+            # Store results at specified intervals
+            if (step + 1) % save_frequency == 0 or step == steps - 1:
+                results.append(np.array(phi.value))
+    except Exception as e:
+        raise RuntimeError(f"Error during advection-diffusion simulation: {str(e)}") from e
     
     # Return the list of stored results
     return results
 
-def run_simulation(simulation_type="diffusion", store_steps=10, **kwargs):
+def _validate_simulation_params(**params: Dict[str, Any]) -> None:
     """
-    Run a simulation based on the specified type.
+    Validate all simulation parameters to ensure they are in acceptable ranges.
     
-    Parameters:
-    -----------
-    simulation_type : str
-        The type of simulation to run ("diffusion", "heat", or "advection_diffusion")
-    store_steps : int
-        Number of timesteps to store for animation
-    **kwargs : dict
-        Parameters to pass to the specific simulation function
+    Args:
+        **params: Dictionary of parameter names and values
         
-    Returns:
-    --------
-    list of numpy.ndarray
-        List of values at stored timesteps
+    Raises:
+        ValueError: If any parameter is invalid
     """
-    # Ensure store_steps is an integer
-    store_steps = int(store_steps)
-    if store_steps <= 0:
-        raise ValueError(f"store_steps must be positive, got {store_steps}")
-        
-    kwargs['store_steps'] = store_steps
+    # Convert integer parameters
+    for param_name in ['nx', 'steps', 'store_steps']:
+        if param_name in params:
+            try:
+                params[param_name] = int(params[param_name])
+            except (ValueError, TypeError):
+                raise ValueError(f"{param_name} must be convertible to an integer, got {params[param_name]}")
     
-    if simulation_type == "diffusion":
-        return run_diffusion_simulation(**kwargs)
-    elif simulation_type == "heat":
-        return run_heat_equation_simulation(**kwargs)
-    elif simulation_type == "advection_diffusion":
-        return run_advection_diffusion_simulation(**kwargs)
-    else:
-        raise ValueError(f"Unknown simulation type: {simulation_type}")
+    # Convert float parameters
+    for param_name in ['dx', 'dt', 'D', 'k', 'velocity']:
+        if param_name in params and params[param_name] is not None:
+            try:
+                params[param_name] = float(params[param_name])
+            except (ValueError, TypeError):
+                raise ValueError(f"{param_name} must be convertible to a float, got {params[param_name]}")
+    
+    # Check integer parameters are positive
+    for param_name in ['nx', 'steps', 'store_steps']:
+        if param_name in params and params[param_name] <= 0:
+            raise ValueError(f"{param_name} must be positive, got {params[param_name]}")
+    
+    # Check float parameters are positive (except velocity which can be negative)
+    for param_name in ['dx', 'dt', 'D', 'k']:
+        if param_name in params and params[param_name] is not None and params[param_name] <= 0:
+            raise ValueError(f"{param_name} must be positive, got {params[param_name]}")
+    
+    # Special case for velocity - can't be zero but can be negative
+    if 'velocity' in params and params['velocity'] is not None and params['velocity'] == 0:
+        raise ValueError("velocity cannot be zero")
 
 if __name__ == "__main__":
     # Run a simple simulation and print the result
